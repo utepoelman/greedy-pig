@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Greedy Pig - Dice Strategy Game</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        pig: {
+                            50: '#fdf2f8',
+                            100: '#fce7f3',
+                            400: '#f472b6',
+                            500: '#ec4899',
+                            600: '#db2777',
+                            800: '#9d174d'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- KaTeX CDN for Math Formula Rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: radial-gradient(circle at top, #1e1b4b 0%, #0f172a 100%);
+            min-height: 100vh;
+            color: #f8fafc;
+        }
+
+        /* Glassmorphism Containers */
+        .glass-card {
+            background: rgba(30, 41, 59, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .glass-card-active {
+            background: rgba(30, 41, 59, 0.9);
+            border: 1px solid rgba(236, 72, 153, 0.5);
+            box-shadow: 0 0 25px rgba(236, 72, 153, 0.25);
+        }
+
+        /* 3D Dice Styling & Transformations */
+        .perspective-container {
+            perspective: 1000px;
+        }
+
+        .die-cube {
+            width: 80px;
+            height: 80px;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.85s cubic-bezier(0.2, 0.85, 0.25, 1);
+        }
+
+        @media (max-width: 640px) {
+            .die-cube {
+                width: 64px;
+                height: 64px;
+            }
+        }
+
+        .die-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(145deg, #ffffff, #e2e8f0);
+            border-radius: 16px;
+            border: 2px solid #cbd5e1;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.1), 0 4px 10px rgba(0,0,0,0.3);
+            display: grid;
+            grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+            padding: 8px;
+            box-sizing: border-box;
+        }
+
+        .pip {
+            background: #0f172a;
+            border-radius: 50%;
+            width: 12px;
+            height: 12px;
+            margin: auto;
+            box-shadow: inset 0 1px 2px rgba(255,255,255,0.4);
+        }
+
+        .pip-red {
+            background: #e11d48;
+        }
+
+        /* Face alignments in 3D space */
+        .face-1 { transform: translateZ(40px); }
+        .face-2 { transform: rotateY(180deg) translateZ(40px); }
+        .face-3 { transform: rotateY(-90deg) translateZ(40px); }
+        .face-4 { transform: rotateY(90deg) translateZ(40px); }
+        .face-5 { transform: rotateX(-90deg) translateZ(40px); }
+        .face-6 { transform: rotateX(90deg) translateZ(40px); }
+
+        @media (max-width: 640px) {
+            .face-1 { transform: translateZ(32px); }
+            .face-2 { transform: rotateY(180deg) translateZ(32px); }
+            .face-3 { transform: rotateY(-90deg) translateZ(32px); }
+            .face-4 { transform: rotateY(90deg) translateZ(32px); }
+            .face-5 { transform: rotateX(-90deg) translateZ(32px); }
+            .face-6 { transform: rotateX(90deg) translateZ(32px); }
+            .pip { width: 9px; height: 9px; }
+        }
+
+        @keyframes activePulse {
+            0%, 100% { border-color: rgba(236, 72, 153, 0.8); box-shadow: 0 0 15px rgba(236, 72, 153, 0.4); }
+            50% { border-color: rgba(236, 72, 153, 0.3); box-shadow: 0 0 5px rgba(236, 72, 153, 0.1); }
+        }
+
+        .turn-active {
+            animation: activePulse 2s infinite;
+        }
+
+        /* KaTeX Formula Overrides for contrast */
+        .katex {
+            font-size: 1.05em;
+            color: #f1f5f9 !important;
+        }
+        .katex-display {
+            margin: 0.5em 0 !important;
+            padding: 0.4em;
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 0.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(100, 116, 139, 0.5);
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body class="p-3 md:p-6 text-slate-100 flex flex-col items-center justify-between min-h-screen">
+
+    <!-- Navigation Header -->
+    <header class="w-full max-w-5xl flex flex-wrap items-center justify-between gap-4 glass-card p-4 rounded-2xl mb-4">
+        <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-pig-500 to-purple-600 flex items-center justify-center shadow-lg shadow-pig-500/30 text-2xl">
+                🐷
+            </div>
+            <div>
+                <h1 class="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-pig-400 via-pink-300 to-purple-300 bg-clip-text text-transparent">
+                    GREEDY PIG
+                </h1>
+                <p class="text-xs text-slate-400 font-medium">Risk, Reward & Probability Strategy</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2 sm:gap-3">
+            <button id="btnSoundToggle" onclick="toggleAudio()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition flex items-center gap-2 border border-slate-700 text-sm font-semibold">
+                <span id="soundIcon">🔊</span>
+                <span id="soundLabel" class="hidden sm:inline">Sound ON</span>
+            </button>
+            <button onclick="openModal('modalRules')" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition flex items-center gap-2 border border-slate-700 text-sm font-semibold">
+                <span>📖</span>
+                <span class="hidden sm:inline">Rules & Maths</span>
+            </button>
+            <button onclick="openModal('modalSetup')" class="px-3 py-2 rounded-xl bg-gradient-to-r from-pig-500 to-purple-600 hover:from-pig-600 hover:to-purple-700 text-white transition flex items-center gap-2 shadow-lg shadow-pig-500/20 text-sm font-bold">
+                <span>⚙️</span>
+                <span>Settings</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Game Arena -->
+    <main class="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-6 my-auto">
+        
+        <!-- Left Column: Dice Tray & Game Controls -->
+        <section class="lg:col-span-7 flex flex-col gap-4">
+            
+            <!-- Turn Header Banner -->
+            <div id="turnBanner" class="glass-card p-4 rounded-2xl flex items-center justify-between border-l-4 border-pig-500 transition-all duration-300">
+                <div class="flex items-center gap-3">
+                    <div id="activeAvatar" class="w-10 h-10 rounded-full bg-pig-500 flex items-center justify-center font-bold text-lg text-white shadow">
+                        P1
+                    </div>
+                    <div>
+                        <div class="text-xs font-semibold uppercase tracking-wider text-slate-400">Current Turn</div>
+                        <div id="activePlayerName" class="text-lg font-bold text-white">Player 1</div>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <span id="badgeDiceMode" class="px-3 py-1 rounded-full text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                        1 Die Pig
+                    </span>
+                    <div id="badgeTarget" class="text-xs font-semibold text-slate-400 mt-1">Goal: 100 pts</div>
+                </div>
+            </div>
+
+            <!-- Dice Tray Container -->
+            <div class="glass-card rounded-2xl p-6 md:p-8 flex flex-col items-center justify-center min-h-[260px] md:min-h-[300px] relative overflow-hidden bg-gradient-to-b from-emerald-950/40 via-slate-900/80 to-slate-900/90 border border-emerald-900/40">
+                
+                <!-- Status Overlay Banner (Pig Out / Catastrophe / Bank) -->
+                <div id="turnStatusOverlay" class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center opacity-0 pointer-events-none transition-all duration-300 z-10 p-4 text-center">
+                    <div id="statusEmoji" class="text-6xl mb-2 animate-bounce">💥</div>
+                    <div id="statusTitle" class="text-2xl font-black tracking-wide text-rose-400 uppercase">PIG OUT!</div>
+                    <div id="statusMessage" class="text-sm font-medium text-slate-300 mt-1">Rolled a 1! Turn score lost.</div>
+                </div>
+
+                <!-- 3D Dice Container -->
+                <div class="perspective-container flex items-center justify-center gap-8 md:gap-12 my-6">
+                    
+                    <!-- Die 1 -->
+                    <div id="die1" class="die-cube">
+                        <div class="die-face face-1">
+                            <div></div><div></div><div></div>
+                            <div></div><div class="pip pip-red"></div><div></div>
+                            <div></div><div></div><div></div>
+                        </div>
+                        <div class="die-face face-2">
+                            <div class="pip"></div><div></div><div></div>
+                            <div></div><div></div><div></div>
+                            <div></div><div></div><div class="pip"></div>
+                        </div>
+                        <div class="die-face face-3">
+                            <div class="pip"></div><div></div><div></div>
+                            <div></div><div class="pip"></div><div></div>
+                            <div></div><div></div><div class="pip"></div>
+                        </div>
+                        <div class="die-face face-4">
+                            <div class="pip"></div><div></div><div class="pip"></div>
+                            <div></div><div></div><div></div>
+                            <div class="pip"></div><div></div><div class="pip"></div>
+                        </div>
+                        <div class="die-face face-5">
+                            <div class="pip"></div><div></div><div class="pip"></div>
+                            <div></div><div class="pip"></div><div></div>
+                            <div class="pip"></div><div></div><div class="pip"></div>
+                        </div>
+                        <div class="die-face face-6">
+                            <div class="pip"></div><div></div><div class="pip"></div>
+                            <div class="pip"></div><div></div><div class="pip"></div>
+                            <div class="pip"></div><div></div><div class="pip"></div>
+                        </div>
+                    </div>
+
+                    <!-- Die 2 (Hidden in 1-Die mode) -->
+                    <div id="die2" class="die-cube hidden">
+                        <div class="die-face face-1">
+                            <div></div><div></div><div></div>
+                            <div></div><div class="pip pip-red"></div><div></div>
+                            <div></div><div></div><div></div>
+                        </div>
+                        <div class="die-face face-2">
+                            <div class="pip"></div><div></div><div></div>
+                            <div></div><div></div><div></div>
+                            <div></div><div></div><div class="pip"></div>
+                        </div>
+                        <div class="die-face face-3">
+                            <div class="pip"></div><div></div><div></div>
+                            <div></div><div class="pip"></div><div></div>
+                            <div></div><div></div><div class="pip"></div>
+                        </div>
+                        <div class="die-face face-4">
+                            <div class="pip"></div><div></div><div class="pip"></div>
+                            <div></div><div></div><div></div>
+                            <div class="pip"></div><div></div><div class="pip"></div>
+                        </div>
+                        <div class="die-face face-5">
+                            <div class="pip"></div><div></div><div class="pip"></div>
+                            <div></div><div class="pip"></div><div></div>
+                            <div class="pip"></div><div></div><div class="pip"></div>
+                        </div>
+                        <div class="die-face face-6">
+                            <div class="pip"></div><div></div><div class="pip"></div>
+                            <div class="pip"></div><div></div><div class="pip"></div>
+                            <div class="pip"></div><div></div><div class="pip"></div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Live Score Counters -->
+                <div class="flex items-center gap-6 mt-2 bg-slate-950/60 px-6 py-3 rounded-xl border border-slate-800">
+                    <div class="text-center">
+                        <div class="text-xs text-slate-400 font-semibold uppercase">Turn Score</div>
+                        <div id="displayTurnScore" class="text-3xl font-black text-amber-400">+0</div>
+                    </div>
+                    <div class="h-8 w-px bg-slate-800"></div>
+                    <div class="text-center">
+                        <div class="text-xs text-slate-400 font-semibold uppercase">Total If Banked</div>
+                        <div id="displayPotentialScore" class="text-2xl font-extrabold text-emerald-400">0</div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Game Control Buttons -->
+            <div class="grid grid-cols-2 gap-4">
+                <button id="btnRoll" onclick="humanRoll()" class="py-4 px-6 rounded-2xl font-black text-lg text-white bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 active:scale-95 transition-all shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-3 border border-emerald-400/30">
+                    <span class="text-2xl">🎲</span>
+                    <span>ROLL DICE</span>
+                </button>
+
+                <button id="btnHold" onclick="humanHold()" class="py-4 px-6 rounded-2xl font-black text-lg text-white bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 active:scale-95 transition-all shadow-lg shadow-amber-500/25 flex items-center justify-center gap-3 border border-amber-400/30">
+                    <span class="text-2xl">🏦</span>
+                    <span>HOLD & BANK</span>
+                </button>
+            </div>
+
+        </section>
+
+        <!-- Right Column: Scoreboard & Activity Stream -->
+        <section class="lg:col-span-5 flex flex-col gap-4">
+            
+            <!-- Player Scoreboard Card -->
+            <div class="glass-card p-5 rounded-2xl flex flex-col gap-3">
+                <div class="flex items-center justify-between border-b border-slate-700/60 pb-2">
+                    <h2 class="text-base font-bold text-slate-200 flex items-center gap-2">
+                        <span>🏆</span>
+                        <span>SCOREBOARD</span>
+                    </h2>
+                    <span id="aiDifficultyBadge" class="hidden text-xs font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                        AI: Optimal
+                    </span>
+                </div>
+
+                <!-- Dynamic Player List -->
+                <div id="playersList" class="flex flex-col gap-2.5 my-1">
+                    <!-- Dynamic rendering via JS -->
+                </div>
+            </div>
+
+            <!-- Activity Stream Log -->
+            <div class="glass-card p-4 rounded-2xl flex flex-col flex-1 min-h-[220px]">
+                <div class="flex items-center justify-between border-b border-slate-700/60 pb-2 mb-2">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                        <span>📜</span>
+                        <span>Activity Feed</span>
+                    </h3>
+                    <button onclick="clearActivityLog()" class="text-[10px] text-slate-400 hover:text-slate-200 uppercase font-semibold">Clear</button>
+                </div>
+                <div id="activityLog" class="flex flex-col gap-1.5 overflow-y-auto max-h-[180px] custom-scrollbar text-xs pr-1">
+                    <div class="text-slate-500 italic text-center py-4">Game ready. Roll the dice to begin!</div>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- New Game Setup Modal -->
+    <div id="modalSetup" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="glass-card max-w-lg w-full rounded-3xl p-6 border border-slate-700 shadow-2xl flex flex-col gap-5 max-h-[90vh] overflow-y-auto custom-scrollbar">
+            
+            <div class="flex items-center justify-between border-b border-slate-700/80 pb-3">
+                <div class="flex items-center gap-3">
+                    <div class="text-3xl">🐷</div>
+                    <div>
+                        <h2 class="text-xl font-extrabold text-white">Game Settings</h2>
+                        <p class="text-xs text-slate-400">Configure game options & players</p>
+                    </div>
+                </div>
+                <button onclick="closeModal('modalSetup')" class="text-slate-400 hover:text-white text-xl font-bold p-1">✕</button>
+            </div>
+
+            <!-- Game Mode -->
+            <div class="flex flex-col gap-2">
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-300">Game Mode</label>
+                <div class="grid grid-cols-2 gap-3">
+                    <button id="btnModeSingle" onclick="selectGameMode('single')" class="p-3 rounded-2xl border-2 border-pig-500 bg-pig-500/20 text-white font-bold text-sm flex flex-col items-center gap-1 transition">
+                        <span class="text-2xl">🤖</span>
+                        <span>Single Player</span>
+                        <span class="text-[10px] font-normal text-slate-300">Human vs Computer</span>
+                    </button>
+                    <button id="btnModeMulti" onclick="selectGameMode('multi')" class="p-3 rounded-2xl border-2 border-slate-700 bg-slate-800/60 text-slate-300 font-bold text-sm flex flex-col items-center gap-1 transition">
+                        <span class="text-2xl">👥</span>
+                        <span>Pass & Play</span>
+                        <span class="text-[10px] font-normal text-slate-400">2 - 4 Human Players</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- AI Difficulty Selection (Single player only) -->
+            <div id="aiDifficultyContainer" class="flex flex-col gap-2">
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-300">Computer AI Level</label>
+                <div class="grid grid-cols-2 gap-3">
+                    <button id="btnAIDiffEasy" onclick="selectAIDifficulty('easy')" class="p-3 rounded-2xl border-2 border-slate-700 bg-slate-800/60 text-slate-300 font-semibold text-xs flex flex-col items-start gap-1 transition">
+                        <span class="font-bold text-sm text-emerald-400">🎲 Low (Casual)</span>
+                        <span class="text-[10px] text-slate-400">Rolls or holds based on basic chance.</span>
+                    </button>
+                    <button id="btnAIDiffOptimal" onclick="selectAIDifficulty('optimal')" class="p-3 rounded-2xl border-2 border-purple-500 bg-purple-500/20 text-white font-semibold text-xs flex flex-col items-start gap-1 transition">
+                        <span class="font-bold text-sm text-purple-300">🧠 High (Optimal EV)</span>
+                        <span class="text-[10px] text-slate-300">Uses exact Expected Value math!</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Dice Configuration -->
+            <div class="flex flex-col gap-2">
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-300">Dice Mode</label>
+                <div class="grid grid-cols-2 gap-3">
+                    <button id="btnDice1" onclick="selectDiceConfig(1)" class="p-3 rounded-2xl border-2 border-pig-500 bg-pig-500/20 text-white font-bold text-sm flex items-center justify-center gap-2 transition">
+                        <span class="text-xl">🎲</span>
+                        <span>Single Die</span>
+                    </button>
+                    <button id="btnDice2" onclick="selectDiceConfig(2)" class="p-3 rounded-2xl border-2 border-slate-700 bg-slate-800/60 text-slate-300 font-bold text-sm flex items-center justify-center gap-2 transition">
+                        <span class="text-xl">🎲🎲</span>
+                        <span>Two Dice</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Target Score -->
+            <div class="flex flex-col gap-2">
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-300">Winning Target Score</label>
+                <div class="grid grid-cols-4 gap-2">
+                    <button onclick="selectTargetScore(50)" class="target-score-btn p-2 rounded-xl border border-slate-700 bg-slate-800 text-slate-200 font-bold text-xs hover:border-pig-500 transition" data-target="50">50</button>
+                    <button onclick="selectTargetScore(100)" class="target-score-btn p-2 rounded-xl border-2 border-pig-500 bg-pig-500/20 text-white font-bold text-xs transition" data-target="100">100</button>
+                    <button onclick="selectTargetScore(150)" class="target-score-btn p-2 rounded-xl border border-slate-700 bg-slate-800 text-slate-200 font-bold text-xs hover:border-pig-500 transition" data-target="150">150</button>
+                    <button onclick="selectTargetScore(200)" class="target-score-btn p-2 rounded-xl border border-slate-700 bg-slate-800 text-slate-200 font-bold text-xs hover:border-pig-500 transition" data-target="200">200</button>
+                </div>
+            </div>
+
+            <!-- Player Name Customization -->
+            <div class="flex flex-col gap-3">
+                <div class="flex items-center justify-between">
+                    <label class="text-xs font-bold uppercase tracking-wider text-slate-300">Player Names</label>
+                    <div id="playerCountSelector" class="hidden flex items-center gap-1">
+                        <span class="text-xs text-slate-400 mr-1">Players:</span>
+                        <button onclick="setPlayerCount(2)" class="btn-pcount px-2 py-0.5 rounded text-xs font-bold bg-pig-500 text-white" data-count="2">2</button>
+                        <button onclick="setPlayerCount(3)" class="btn-pcount px-2 py-0.5 rounded text-xs font-bold bg-slate-800 text-slate-300" data-count="3">3</button>
+                        <button onclick="setPlayerCount(4)" class="btn-pcount px-2 py-0.5 rounded text-xs font-bold bg-slate-800 text-slate-300" data-count="4">4</button>
+                    </div>
+                </div>
+
+                <div id="playerInputsContainer" class="flex flex-col gap-2">
+                    <!-- Rendered via JS -->
+                </div>
+            </div>
+
+            <button onclick="startNewGameFromSetup()" class="w-full py-3.5 px-6 rounded-2xl font-extrabold text-base text-white bg-gradient-to-r from-pig-500 via-pink-500 to-purple-600 hover:opacity-95 shadow-xl shadow-pig-500/30 transition mt-2">
+                START GAME 🚀
+            </button>
+
+        </div>
+    </div>
+
+    <!-- Rules & KaTeX Math Modal -->
+    <div id="modalRules" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="glass-card max-w-2xl w-full rounded-3xl p-6 border border-slate-700 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto custom-scrollbar">
+            
+            <div class="flex items-center justify-between border-b border-slate-700/80 pb-3">
+                <h2 class="text-xl font-extrabold text-white flex items-center gap-2">
+                    <span>📖</span>
+                    <span>Game Rules & Mathematical Optimisation</span>
+                </h2>
+                <button onclick="closeModal('modalRules')" class="text-slate-400 hover:text-white text-xl font-bold p-1">✕</button>
+            </div>
+
+            <!-- Single Die Rules -->
+            <div class="bg-slate-800/60 p-4 rounded-2xl border border-slate-700/80 flex flex-col gap-2">
+                <h3 class="text-sm font-bold text-amber-400 flex items-center gap-2">
+                    <span>🎲</span>
+                    <span>Single Die Game Rules</span>
+                </h3>
+                <ul class="text-xs text-slate-300 flex flex-col gap-1.5 list-disc pl-4">
+                    <li>A player rolls the die repeatedly and accumulates turn points.</li>
+                    <li>Rolling <strong>2, 3, 4, 5, or 6</strong> adds that face value to the current round score.</li>
+                    <li>Rolling a <strong>1 ("PIG")</strong> resets the current round score to $0$ and ends the turn immediately.</li>
+                    <li>A player can choose to <strong>HOLD</strong> at any time to bank their accumulated round score into their grand total.</li>
+                </ul>
+            </div>
+
+            <!-- Two Dice Rules -->
+            <div class="bg-slate-800/60 p-4 rounded-2xl border border-slate-700/80 flex flex-col gap-2">
+                <h3 class="text-sm font-bold text-purple-400 flex items-center gap-2">
+                    <span>🎲🎲</span>
+                    <span>Two Dice Game Rules</span>
+                </h3>
+                <ul class="text-xs text-slate-300 flex flex-col gap-1.5 list-disc pl-4">
+                    <li>Roll two dice simultaneously.</li>
+                    <li><strong>No 1s rolled (e.g., [3, 5]):</strong> The sum ($3 + 5 = 8$) is added to the turn score.</li>
+                    <li><strong>Single 1 rolled (e.g., [1, 4]):</strong> Round score drops to $0$ and the turn ends ("Pig Out").</li>
+                    <li><strong>DOUBLE 1 rolled ([1, 1]):</strong> <span class="text-rose-400 font-bold">CATASTROPHIC PIG OUT!</span> The round score drops to $0$ AND the player's ENTIRE accumulated game score drops to $0$! Turn ends immediately.</li>
+                </ul>
+            </div>
+
+            <!-- Perfectly Formatted KaTeX Mathematics Section -->
+            <div class="bg-purple-950/40 p-4 rounded-2xl border border-purple-500/30 flex flex-col gap-3">
+                <h3 class="text-sm font-bold text-pink-300 flex items-center gap-2">
+                    <span>🧠</span>
+                    <span>Mathematical Expected Value (EV) Strategy</span>
+                </h3>
+
+                <div class="text-xs text-slate-300 flex flex-col gap-2">
+                    <p class="font-semibold text-slate-200">1. Single Die Expected Value Formula:</p>
+                    <p>
+                        Let $k$ be the current accumulated turn score. The average gain on rolling a non-1 face (2 through 6) is $\frac{2+3+4+5+6}{5} = 4$. With probability $\frac{5}{6}$, you gain $+4$ points; with probability $\frac{1}{6}$, you roll a 1 and lose all $k$ points:
+                    </p>
+                    $$\mathbb{E}[\text{gain}] = \frac{5}{6}(+4) - \frac{1}{6}(k) = \frac{20 - k}{6}$$
+                    <p>
+                        Rolling again yields a positive expected gain when $\mathbb{E}[\text{gain}] > 0 \implies k < 20$. Thus, the baseline optimal strategy is to <strong>HOLD as soon as turn score $k \ge 20$</strong>!
+                    </p>
+
+                    <p class="font-semibold text-slate-200 mt-2">2. Two Dice Expected Value Formula:</p>
+                    <p>
+                        With two dice, there are 36 outcomes: 25 safe outcomes (avg sum $+7$), 10 single 1 outcomes (lose $k$), and 1 double 1 outcome (lose $k + T$, where $T$ is total banked score):
+                    </p>
+                    $$\mathbb{E}[\text{gain}] = \frac{25}{36}(+7) - \frac{10}{36}(k) - \frac{1}{36}(k + T) = \frac{200 - 11k - T}{36}$$
+                    <p>
+                        Rolling again yields a positive expected gain when $200 - 11k - T > 0$. Thus, the baseline optimal hold threshold is:
+                    </p>
+                    $$k \ge \frac{200 - T}{11}$$
+                </div>
+            </div>
+
+            <button onclick="closeModal('modalRules')" class="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm transition mt-1">
+                Got it, Let's Play!
+            </button>
+
+        </div>
+    </div>
+
+    <!-- Winner Modal -->
+    <div id="modalWinner" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="glass-card max-w-md w-full rounded-3xl p-6 border border-pig-500/50 shadow-2xl flex flex-col items-center text-center gap-4 relative overflow-hidden">
+            <div class="text-6xl animate-bounce">👑</div>
+            <div>
+                <h2 class="text-2xl font-black bg-gradient-to-r from-amber-300 via-pig-400 to-purple-300 bg-clip-text text-transparent">
+                    VICTORY!
+                </h2>
+                <div id="winnerText" class="text-xl font-bold text-white mt-1">Player 1 Wins!</div>
+            </div>
+
+            <div id="winnerStats" class="w-full bg-slate-900/80 p-4 rounded-2xl border border-slate-800 flex justify-around my-2 text-sm">
+                <div>
+                    <div class="text-xs text-slate-400 font-semibold uppercase">Final Score</div>
+                    <div id="winnerScoreVal" class="text-2xl font-black text-emerald-400">104</div>
+                </div>
+                <div class="w-px bg-slate-800"></div>
+                <div>
+                    <div class="text-xs text-slate-400 font-semibold uppercase">Total Turns</div>
+                    <div id="winnerTurnsVal" class="text-2xl font-black text-amber-400">8</div>
+                </div>
+            </div>
+
+            <button onclick="closeModal('modalWinner'); openModal('modalSetup');" class="w-full py-3.5 px-6 rounded-2xl font-extrabold text-base text-white bg-gradient-to-r from-pig-500 to-purple-600 hover:opacity-95 shadow-lg shadow-pig-500/30 transition">
+                PLAY AGAIN 🔄
+            </button>
+        </div>
+    </div>
+
+    <!-- Canvas Confetti Overlay -->
+    <canvas id="confettiCanvas" class="fixed inset-0 pointer-events-none z-40 w-full h-full"></canvas>
+
+    <script>
+        // Web Audio API Sound Synthesizer Engine
+        let audioCtx = null;
+        let isMuted = false;
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (AudioContext) {
+                    audioCtx = new AudioContext();
+                }
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function toggleAudio() {
+            isMuted = !isMuted;
+            document.getElementById('soundIcon').innerText = isMuted ? '🔇' : '🔊';
+            document.getElementById('soundLabel').innerText = isMuted ? 'Sound OFF' : 'Sound ON';
+        }
+
+        function playSound(type) {
+            if (isMuted) return;
+            initAudio();
+            if (!audioCtx) return;
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'roll') {
+                const bufferSize = audioCtx.sampleRate * 0.08;
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = 1000;
+                const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(audioCtx.destination);
+                noise.start(now);
+            } else if (type === 'score') {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, now);
+                osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.15);
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'hold') {
+                const osc1 = audioCtx.createOscillator();
+                const osc2 = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc1.type = 'triangle';
+                osc2.type = 'triangle';
+                osc1.frequency.setValueAtTime(587.33, now);
+                osc2.frequency.setValueAtTime(880, now + 0.08);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                osc1.connect(gain);
+                osc2.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc1.start(now);
+                osc2.start(now + 0.08);
+                osc1.stop(now + 0.35);
+                osc2.stop(now + 0.35);
+            } else if (type === 'pigout') {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(220, now);
+                osc.frequency.linearRampToValueAtTime(110, now + 0.3);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'catastrophe') {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, now);
+                osc.frequency.exponentialRampToValueAtTime(40, now + 0.6);
+                gain.gain.setValueAtTime(0.5, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.6);
+            } else if (type === 'win') {
+                const notes = [523.25, 659.25, 783.99, 1046.50];
+                notes.forEach((freq, idx) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0.3, now + idx * 0.12);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.12 + 0.3);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now + idx * 0.12);
+                    osc.stop(now + idx * 0.12 + 0.3);
+                });
+            }
+        }
+
+        // Game State Structure
+        const gameState = {
+            mode: 'single', // 'single' or 'multi'
+            diceCount: 1, // 1 or 2
+            aiDifficulty: 'optimal', // 'easy' or 'optimal'
+            targetScore: 100,
+            players: [],
+            activePlayerIndex: 0,
+            currentTurnScore: 0,
+            isRolling: false,
+            gameOver: false,
+            dieRotation1: { x: 0, y: 0 },
+            dieRotation2: { x: 0, y: 0 }
+        };
+
+        const AVATAR_COLORS = [
+            'bg-pig-500',
+            'bg-emerald-500',
+            'bg-purple-500',
+            'bg-amber-500'
+        ];
+
+        // 3D Face Rotation Map
+        const FACE_TRANSFORMS = {
+            1: { x: 0, y: 0 },
+            2: { x: 0, y: 180 },
+            3: { x: 0, y: 90 },
+            4: { x: 0, y: -90 },
+            5: { x: 90, y: 0 },
+            6: { x: -90, y: 0 }
+        };
+
+        // Initialize KaTeX Math & Application on load
+        window.addEventListener('DOMContentLoaded', () => {
+            renderMathFormulas();
+            selectGameMode('single');
+            selectDiceConfig(1);
+            selectTargetScore(100);
+            startNewGame();
+        });
+
+        function renderMathFormulas() {
+            if (window.renderMathInElement) {
+                renderMathInElement(document.body, {
+                    delimiters: [
+                        { left: '$$', right: '$$', display: true },
+                        { left: '$', right: '$', display: false }
+                    ],
+                    throwOnError: false
+                });
+            }
+        }
+
+        function openModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.remove('opacity-0', 'pointer-events-none');
+                if (modalId === 'modalRules') {
+                    // Trigger KaTeX render if needed
+                    setTimeout(renderMathFormulas, 50);
+                }
+            }
+        }
+
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.add('opacity-0', 'pointer-events-none');
+            }
+        }
+
+        function selectGameMode(mode) {
+            gameState.mode = mode;
+            const btnSingle = document.getElementById('btnModeSingle');
+            const btnMulti = document.getElementById('btnModeMulti');
+            const aiContainer = document.getElementById('aiDifficultyContainer');
+            const playerCountSelector = document.getElementById('playerCountSelector');
+
+            if (mode === 'single') {
+                btnSingle.className = 'p-3 rounded-2xl border-2 border-pig-500 bg-pig-500/20 text-white font-bold text-sm flex flex-col items-center gap-1 transition';
+                btnMulti.className = 'p-3 rounded-2xl border-2 border-slate-700 bg-slate-800/60 text-slate-300 font-bold text-sm flex flex-col items-center gap-1 transition';
+                aiContainer.classList.remove('hidden');
+                playerCountSelector.classList.add('hidden');
+            } else {
+                btnMulti.className = 'p-3 rounded-2xl border-2 border-pig-500 bg-pig-500/20 text-white font-bold text-sm flex flex-col items-center gap-1 transition';
+                btnSingle.className = 'p-3 rounded-2xl border-2 border-slate-700 bg-slate-800/60 text-slate-300 font-bold text-sm flex flex-col items-center gap-1 transition';
+                aiContainer.classList.add('hidden');
+                playerCountSelector.classList.remove('hidden');
+            }
+            renderPlayerInputs();
+        }
+
+        function selectAIDifficulty(diff) {
+            gameState.aiDifficulty = diff;
+            const btnEasy = document.getElementById('btnAIDiffEasy');
+            const btnOpt = document.getElementById('btnAIDiffOptimal');
+
+            if (diff === 'easy') {
+                btnEasy.className = 'p-3 rounded-2xl border-2 border-emerald-500 bg-emerald-500/20 text-white font-semibold text-xs flex flex-col items-start gap-1 transition';
+                btnOpt.className = 'p-3 rounded-2xl border-2 border-slate-700 bg-slate-800/60 text-slate-300 font-semibold text-xs flex flex-col items-start gap-1 transition';
+            } else {
+                btnOpt.className = 'p-3 rounded-2xl border-2 border-purple-500 bg-purple-500/20 text-white font-semibold text-xs flex flex-col items-start gap-1 transition';
+                btnEasy.className = 'p-3 rounded-2xl border-2 border-slate-700 bg-slate-800/60 text-slate-300 font-semibold text-xs flex flex-col items-start gap-1 transition';
+            }
+        }
+
+        function selectDiceConfig(count) {
+            gameState.diceCount = count;
+            const btn1 = document.getElementById('btnDice1');
+            const btn2 = document.getElementById('btnDice2');
+
+            if (count === 1) {
+                btn1.className = 'p-3 rounded-2xl border-2 border-pig-500 bg-pig-500/20 text-white font-bold text-sm flex items-center justify-center gap-2 transition';
+                btn2.className = 'p-3 rounded-2xl border-2 border-slate-700 bg-slate-800/60 text-slate-300 font-bold text-sm flex items-center justify-center gap-2 transition';
+            } else {
+                btn2.className = 'p-3 rounded-2xl border-2 border-pig-500 bg-pig-500/20 text-white font-bold text-sm flex items-center justify-center gap-2 transition';
+                btn1.className = 'p-3 rounded-2xl border-2 border-slate-700 bg-slate-800/60 text-slate-300 font-bold text-sm flex items-center justify-center gap-2 transition';
+            }
+        }
+
+        function selectTargetScore(val) {
+            gameState.targetScore = val;
+            document.querySelectorAll('.target-score-btn').forEach(btn => {
+                if (parseInt(btn.getAttribute('data-target')) === val) {
+                    btn.className = 'target-score-btn p-2 rounded-xl border-2 border-pig-500 bg-pig-500/20 text-white font-bold text-xs transition';
+                } else {
+                    btn.className = 'target-score-btn p-2 rounded-xl border border-slate-700 bg-slate-800 text-slate-200 font-bold text-xs hover:border-pig-500 transition';
+                }
+            });
+        }
+
+        let currentMultiPlayerCount = 2;
+
+        function setPlayerCount(cnt) {
+            currentMultiPlayerCount = cnt;
+            document.querySelectorAll('.btn-pcount').forEach(btn => {
+                if (parseInt(btn.getAttribute('data-count')) === cnt) {
+                    btn.className = 'btn-pcount px-2 py-0.5 rounded text-xs font-bold bg-pig-500 text-white';
+                } else {
+                    btn.className = 'btn-pcount px-2 py-0.5 rounded text-xs font-bold bg-slate-800 text-slate-300';
+                }
+            });
+            renderPlayerInputs();
+        }
+
+        function renderPlayerInputs() {
+            const container = document.getElementById('playerInputsContainer');
+            container.innerHTML = '';
+
+            if (gameState.mode === 'single') {
+                container.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm">👤</span>
+                        <input id="inputP1" type="text" value="Human Player" placeholder="Your Name" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-pig-500">
+                    </div>
+                    <div class="flex items-center gap-2 opacity-75">
+                        <span class="text-sm">🤖</span>
+                        <input type="text" value="Piggy AI Bot" disabled class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-400">
+                    </div>
+                `;
+            } else {
+                for (let i = 1; i <= currentMultiPlayerCount; i++) {
+                    container.innerHTML += `
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm">👤</span>
+                            <input id="inputP${i}" type="text" value="Player ${i}" placeholder="Player ${i} Name" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-pig-500">
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        function startNewGameFromSetup() {
+            gameState.players = [];
+
+            if (gameState.mode === 'single') {
+                const name1 = document.getElementById('inputP1')?.value.trim() || 'Human Player';
+                gameState.players.push({ id: 0, name: name1, totalScore: 0, turnCount: 0, isAI: false, color: AVATAR_COLORS[0] });
+                gameState.players.push({ id: 1, name: 'Piggy AI Bot', totalScore: 0, turnCount: 0, isAI: true, color: AVATAR_COLORS[1] });
+            } else {
+                for (let i = 1; i <= currentMultiPlayerCount; i++) {
+                    const name = document.getElementById(`inputP${i}`)?.value.trim() || `Player ${i}`;
+                    gameState.players.push({ id: i - 1, name: name, totalScore: 0, turnCount: 0, isAI: false, color: AVATAR_COLORS[(i - 1) % 4] });
+                }
+            }
+
+            closeModal('modalSetup');
+            startNewGame();
+        }
+
+        function startNewGame() {
+            if (gameState.players.length === 0) {
+                gameState.players = [
+                    { id: 0, name: 'Player 1', totalScore: 0, turnCount: 0, isAI: false, color: AVATAR_COLORS[0] },
+                    { id: 1, name: 'Piggy AI Bot', totalScore: 0, turnCount: 0, isAI: true, color: AVATAR_COLORS[1] }
+                ];
+            } else {
+                gameState.players.forEach(p => {
+                    p.totalScore = 0;
+                    p.turnCount = 0;
+                });
+            }
+
+            gameState.activePlayerIndex = 0;
+            gameState.currentTurnScore = 0;
+            gameState.isRolling = false;
+            gameState.gameOver = false;
+
+            const die2El = document.getElementById('die2');
+            if (gameState.diceCount === 2) {
+                die2El.classList.remove('hidden');
+            } else {
+                die2El.classList.add('hidden');
+            }
+
+            document.getElementById('badgeDiceMode').innerText = gameState.diceCount === 1 ? '1 Die Pig' : '2 Dice Pig';
+            document.getElementById('badgeTarget').innerText = `Goal: ${gameState.targetScore} pts`;
+
+            const aiBadge = document.getElementById('aiDifficultyBadge');
+            if (gameState.mode === 'single') {
+                aiBadge.classList.remove('hidden');
+                aiBadge.innerText = `AI: ${gameState.aiDifficulty === 'optimal' ? 'Optimal Strategy' : 'Casual'}`;
+            } else {
+                aiBadge.classList.add('hidden');
+            }
+
+            clearActivityLog();
+            addActivityLog(`🎯 Game started! Goal: ${gameState.targetScore} pts in ${gameState.diceCount}-Die mode.`);
+
+            updateUI();
+            checkAndExecuteAITurn();
+        }
+
+        function rollDice3D(val1, val2, callback) {
+            gameState.isRolling = true;
+            playSound('roll');
+
+            const rot1 = gameState.dieRotation1;
+            rot1.x += 720 + FACE_TRANSFORMS[val1].x - (rot1.x % 360);
+            rot1.y += 1080 + FACE_TRANSFORMS[val1].y - (rot1.y % 360);
+
+            const die1El = document.getElementById('die1');
+            die1El.style.transform = `rotateX(${rot1.x}deg) rotateY(${rot1.y}deg)`;
+
+            if (gameState.diceCount === 2 && val2) {
+                const rot2 = gameState.dieRotation2;
+                rot2.x += 720 + FACE_TRANSFORMS[val2].x - (rot2.x % 360);
+                rot2.y += 1080 + FACE_TRANSFORMS[val2].y - (rot2.y % 360);
+
+                const die2El = document.getElementById('die2');
+                die2El.style.transform = `rotateX(${rot2.x}deg) rotateY(${rot2.y}deg)`;
+            }
+
+            setTimeout(() => {
+                gameState.isRolling = false;
+                if (callback) callback();
+            }, 850);
+        }
+
+        function humanRoll() {
+            if (gameState.isRolling || gameState.gameOver) return;
+            const activePlayer = gameState.players[gameState.activePlayerIndex];
+            if (activePlayer.isAI) return;
+
+            executeRoll();
+        }
+
+        function humanHold() {
+            if (gameState.isRolling || gameState.gameOver) return;
+            const activePlayer = gameState.players[gameState.activePlayerIndex];
+            if (activePlayer.isAI) return;
+
+            executeHold();
+        }
+
+        function executeRoll() {
+            const activePlayer = gameState.players[gameState.activePlayerIndex];
+            
+            const r1 = Math.floor(Math.random() * 6) + 1;
+            const r2 = gameState.diceCount === 2 ? Math.floor(Math.random() * 6) + 1 : null;
+
+            rollDice3D(r1, r2, () => {
+                evaluateRollResult(r1, r2);
+            });
+        }
+
+        function evaluateRollResult(r1, r2) {
+            const activePlayer = gameState.players[gameState.activePlayerIndex];
+
+            if (gameState.diceCount === 1) {
+                if (r1 === 1) {
+                    showStatusOverlay('💥', 'PIG OUT!', `${activePlayer.name} rolled a 1! Turn score lost.`, 'rose');
+                    playSound('pigout');
+                    addActivityLog(`❌ <strong>${activePlayer.name}</strong> rolled a <strong>1</strong>! Turn score resets to 0.`);
+                    gameState.currentTurnScore = 0;
+                    endTurn();
+                } else {
+                    gameState.currentTurnScore += r1;
+                    playSound('score');
+                    addActivityLog(`🎲 <strong>${activePlayer.name}</strong> rolled a <strong>${r1}</strong> (+${r1} turn pts).`);
+                    updateUI();
+                    checkAndExecuteAITurn();
+                }
+            } else {
+                if (r1 === 1 && r2 === 1) {
+                    showStatusOverlay('☠️', 'CATASTROPHIC PIG OUT!', `DOUBLE 1s! Entire game total resets to 0!`, 'rose');
+                    playSound('catastrophe');
+                    addActivityLog(`💀 <strong>${activePlayer.name}</strong> rolled <strong class="text-rose-400">DOUBLE 1s</strong>! TOTAL SCORE WIPED OUT!`);
+                    activePlayer.totalScore = 0;
+                    gameState.currentTurnScore = 0;
+                    endTurn();
+                } else if (r1 === 1 || r2 === 1) {
+                    showStatusOverlay('💥', 'PIG OUT!', `${activePlayer.name} rolled a 1 (${r1}, ${r2})! Turn score lost.`, 'amber');
+                    playSound('pigout');
+                    addActivityLog(`❌ <strong>${activePlayer.name}</strong> rolled a 1 (${r1}, ${r2}). Turn score resets to 0.`);
+                    gameState.currentTurnScore = 0;
+                    endTurn();
+                } else {
+                    const sum = r1 + r2;
+                    gameState.currentTurnScore += sum;
+                    playSound('score');
+                    addActivityLog(`🎲🎲 <strong>${activePlayer.name}</strong> rolled <strong>${r1} & ${r2}</strong> (+${sum} turn pts).`);
+                    updateUI();
+                    checkAndExecuteAITurn();
+                }
+            }
+        }
+
+        function executeHold() {
+            const activePlayer = gameState.players[gameState.activePlayerIndex];
+            const pointsBanked = gameState.currentTurnScore;
+
+            activePlayer.totalScore += pointsBanked;
+            playSound('hold');
+            addActivityLog(`🏦 <strong>${activePlayer.name}</strong> BANKED <strong>+${pointsBanked}</strong> points! Total: ${activePlayer.totalScore}`);
+
+            showStatusOverlay('💰', 'SCORE BANKED!', `+${pointsBanked} points saved to total!`, 'emerald');
+
+            if (activePlayer.totalScore >= gameState.targetScore) {
+                setTimeout(() => {
+                    handleVictory(activePlayer);
+                }, 600);
+            } else {
+                gameState.currentTurnScore = 0;
+                endTurn();
+            }
+        }
+
+        function endTurn() {
+            const activePlayer = gameState.players[gameState.activePlayerIndex];
+            activePlayer.turnCount++;
+
+            setTimeout(() => {
+                hideStatusOverlay();
+                gameState.currentTurnScore = 0;
+                gameState.activePlayerIndex = (gameState.activePlayerIndex + 1) % gameState.players.length;
+                updateUI();
+                checkAndExecuteAITurn();
+            }, 1100);
+        }
+
+        // Computer AI Strategy Logic
+        function checkAndExecuteAITurn() {
+            if (gameState.gameOver) return;
+
+            const activePlayer = gameState.players[gameState.activePlayerIndex];
+            if (!activePlayer.isAI) {
+                toggleControls(true);
+                return;
+            }
+
+            toggleControls(false);
+
+            setTimeout(() => {
+                if (gameState.gameOver) return;
+
+                const shouldHold = decideAIMove(activePlayer);
+
+                if (shouldHold && gameState.currentTurnScore > 0) {
+                    executeHold();
+                } else {
+                    executeRoll();
+                }
+            }, 900);
+        }
+
+        function decideAIMove(aiPlayer) {
+            const turnScore = gameState.currentTurnScore;
+            const totalScore = aiPlayer.totalScore;
+            const target = gameState.targetScore;
+
+            // 1. Mandatory win check
+            if (turnScore + totalScore >= target) {
+                return true;
+            }
+
+            // 2. First roll mandatory
+            if (turnScore === 0) {
+                return false;
+            }
+
+            let maxOpponentTotal = 0;
+            gameState.players.forEach(p => {
+                if (p.id !== aiPlayer.id && p.totalScore > maxOpponentTotal) {
+                    maxOpponentTotal = p.totalScore;
+                }
+            });
+
+            const opponentNearWin = maxOpponentTotal >= target - 20;
+
+            if (gameState.aiDifficulty === 'easy') {
+                // Low Level AI: Chance-based decision
+                const baseThreshold = gameState.diceCount === 1 ? 14 : 12;
+                // Add slight randomness (+/- 3 pts)
+                const randomOffset = Math.floor(Math.random() * 7) - 3;
+                return turnScore >= (baseThreshold + randomOffset);
+            }
+
+            // High Level AI: Mathematical Expected Value Optimization
+            if (gameState.diceCount === 1) {
+                // EV Formula: Gain > 0 while turn score k < 20
+                let threshold = 20;
+
+                // Endgame catch-up modification
+                if (opponentNearWin && totalScore < maxOpponentTotal) {
+                    threshold = Math.max(24, target - totalScore);
+                }
+
+                return turnScore >= threshold;
+            } else {
+                // EV Formula for 2 dice: k < (200 - T) / 11
+                const evCutoff = Math.max(0, (200 - totalScore) / 11);
+                let holdThreshold = evCutoff;
+
+                if (opponentNearWin && totalScore < maxOpponentTotal) {
+                    holdThreshold = Math.min(25, target - totalScore);
+                } else if (holdThreshold < 8 && totalScore < target - 20) {
+                    holdThreshold = 8;
+                }
+
+                return turnScore >= holdThreshold;
+            }
+        }
+
+        // Victory Confetti Generator
+        let confettiAnimationId = null;
+
+        function triggerConfetti() {
+            const canvas = document.getElementById('confettiCanvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const particles = [];
+            const colors = ['#ec4899', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#f43f5e'];
+
+            for (let i = 0; i < 120; i++) {
+                particles.push({
+                    x: canvas.width / 2,
+                    y: canvas.height / 2,
+                    vx: (Math.random() - 0.5) * 16,
+                    vy: (Math.random() - 0.7) * 16,
+                    size: Math.random() * 8 + 4,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    rotation: Math.random() * 360,
+                    rSpeed: (Math.random() - 0.5) * 10,
+                    life: 1
+                });
+            }
+
+            function render() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                let alive = false;
+
+                particles.forEach(p => {
+                    if (p.life > 0) {
+                        alive = true;
+                        p.x += p.vx;
+                        p.y += p.vy;
+                        p.vy += 0.25;
+                        p.life -= 0.008;
+                        p.rotation += p.rSpeed;
+
+                        ctx.save();
+                        ctx.translate(p.x, p.y);
+                        ctx.rotate((p.rotation * Math.PI) / 180);
+                        ctx.fillStyle = p.color;
+                        ctx.globalAlpha = Math.max(0, p.life);
+                        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+                        ctx.restore();
+                    }
+                });
+
+                if (alive) {
+                    confettiAnimationId = requestAnimationFrame(render);
+                }
+            }
+
+            if (confettiAnimationId) cancelAnimationFrame(confettiAnimationId);
+            render();
+        }
+
+        function handleVictory(winner) {
+            gameState.gameOver = true;
+            playSound('win');
+            triggerConfetti();
+
+            document.getElementById('winnerText').innerText = `${winner.name} Wins! 🎉`;
+            document.getElementById('winnerScoreVal').innerText = winner.totalScore;
+            document.getElementById('winnerTurnsVal').innerText = winner.turnCount + 1;
+
+            addActivityLog(`👑 🏆 <strong>${winner.name} HAS WON THE GAME WITH ${winner.totalScore} POINTS!</strong>`);
+
+            openModal('modalWinner');
+        }
+
+        function toggleControls(enable) {
+            const btnRoll = document.getElementById('btnRoll');
+            const btnHold = document.getElementById('btnHold');
+
+            if (enable && !gameState.gameOver) {
+                btnRoll.disabled = false;
+                btnHold.disabled = false;
+                btnRoll.classList.remove('opacity-50', 'cursor-not-allowed');
+                btnHold.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                btnRoll.disabled = true;
+                btnHold.disabled = true;
+                btnRoll.classList.add('opacity-50', 'cursor-not-allowed');
+                btnHold.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        function showStatusOverlay(emoji, title, message, themeColor) {
+            const overlay = document.getElementById('turnStatusOverlay');
+            document.getElementById('statusEmoji').innerText = emoji;
+            const titleEl = document.getElementById('statusTitle');
+            titleEl.innerText = title;
+            document.getElementById('statusMessage').innerText = message;
+
+            if (themeColor === 'rose') {
+                titleEl.className = 'text-2xl font-black tracking-wide text-rose-400 uppercase';
+            } else if (themeColor === 'amber') {
+                titleEl.className = 'text-2xl font-black tracking-wide text-amber-400 uppercase';
+            } else {
+                titleEl.className = 'text-2xl font-black tracking-wide text-emerald-400 uppercase';
+            }
+
+            overlay.classList.remove('opacity-0', 'pointer-events-none');
+        }
+
+        function hideStatusOverlay() {
+            const overlay = document.getElementById('turnStatusOverlay');
+            overlay.classList.add('opacity-0', 'pointer-events-none');
+        }
+
+        function updateUI() {
+            const activePlayer = gameState.players[gameState.activePlayerIndex];
+
+            const activeAvatar = document.getElementById('activeAvatar');
+            activeAvatar.innerText = activePlayer.isAI ? '🤖' : `P${activePlayer.id + 1}`;
+            activeAvatar.className = `w-10 h-10 rounded-full ${activePlayer.color} flex items-center justify-center font-bold text-lg text-white shadow`;
+
+            document.getElementById('activePlayerName').innerText = activePlayer.name + (activePlayer.isAI ? ' (AI)' : '');
+
+            document.getElementById('displayTurnScore').innerText = `+${gameState.currentTurnScore}`;
+            document.getElementById('displayPotentialScore').innerText = activePlayer.totalScore + gameState.currentTurnScore;
+
+            const listEl = document.getElementById('playersList');
+            listEl.innerHTML = '';
+
+            gameState.players.forEach((p, idx) => {
+                const isActive = idx === gameState.activePlayerIndex;
+                const progressPct = Math.min(100, Math.round((p.totalScore / gameState.targetScore) * 100));
+
+                const card = document.createElement('div');
+                card.className = `p-3 rounded-2xl transition-all duration-300 flex flex-col gap-2 ${isActive ? 'glass-card-active turn-active' : 'bg-slate-800/40 border border-slate-700/40'}`;
+
+                card.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-full ${p.color} flex items-center justify-center font-bold text-xs text-white shadow">
+                                ${p.isAI ? '🤖' : `P${p.id + 1}`}
+                            </div>
+                            <div>
+                                <div class="text-sm font-bold text-white flex items-center gap-1.5">
+                                    <span>${p.name}</span>
+                                    ${isActive ? '<span class="text-[10px] bg-pig-500 text-white font-extrabold px-1.5 py-0.2 rounded-full">TURN</span>' : ''}
+                                </div>
+                                <div class="text-[10px] text-slate-400 font-medium">Turns played: ${p.turnCount}</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xl font-black text-emerald-400">${p.totalScore}</div>
+                            <div class="text-[10px] text-slate-400">/ ${gameState.targetScore}</div>
+                        </div>
+                    </div>
+                    <div class="w-full bg-slate-900/80 h-2 rounded-full overflow-hidden border border-slate-800">
+                        <div class="h-full bg-gradient-to-r from-pig-500 to-emerald-400 rounded-full transition-all duration-500" style="width: ${progressPct}%"></div>
+                    </div>
+                `;
+
+                listEl.appendChild(card);
+            });
+        }
+
+        function addActivityLog(msg) {
+            const logEl = document.getElementById('activityLog');
+            if (logEl.children.length === 1 && logEl.children[0].classList.contains('italic')) {
+                logEl.innerHTML = '';
+            }
+
+            const item = document.createElement('div');
+            item.className = 'py-1 px-2.5 rounded-lg bg-slate-800/50 border border-slate-700/40 text-slate-200 text-xs flex items-center justify-between';
+            item.innerHTML = `<span>${msg}</span><span class="text-[9px] text-slate-400">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>`;
+
+            logEl.appendChild(item);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function clearActivityLog() {
+            const logEl = document.getElementById('activityLog');
+            logEl.innerHTML = '<div class="text-slate-500 italic text-center py-4">Activity log cleared.</div>';
+        }
+    </script>
+</body>
+</html>
